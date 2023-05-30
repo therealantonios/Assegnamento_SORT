@@ -6,7 +6,7 @@
 void task0()
 {
 	std::cout << "Sono il task n.0" << std::endl;
-	busy_wait(90);
+	busy_wait(9000);
 	std::cout << "Sono il task n.00 FINE" << std::endl;
 }
 

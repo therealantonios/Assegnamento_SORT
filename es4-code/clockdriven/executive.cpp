@@ -13,6 +13,11 @@ Executive::Executive(size_t num_tasks, unsigned int frame_length, unsigned int u
 {
 }
 
+	auto ncycle = 0;
+	auto nexec = 0;
+	auto nmiss = 0;
+	auto ncanc = 0;
+
 void Executive::set_periodic_task(size_t task_id, std::function<void()> periodic_task, unsigned int wcet) //wcet è il t di esec del task task_id
 {
 	assert(task_id < p_tasks.size()); // Fallisce in caso di task_id non corretto (fuori range)
@@ -53,6 +58,10 @@ void Executive::start()
 	rt::set_priority(exec_thread, rt::priority::rt_max);
 	rt::set_affinity(exec_thread, 1);
 
+	//inizializziamo i contatori  per le stats globali 
+		//p_tasks[task_id].wcet = wcet;
+
+
 	if (stats_observer)
 		stats_thread = std::thread(&Executive::stats_function, this);
 }
@@ -83,7 +92,10 @@ void Executive::task_function(Executive::task_data & task ) //funzione che decid
 		task.stato = task_state ::RUNNING;
 		//libero dalla sezione critica
 		lock.unlock();
+
 		task.function(); //sleep
+		nexec+=1;
+		std::cerr << "task eseguito NUMERO :  " << nexec << std::endl;
 		//ogni volta che devo agire sullo stato ho bisogno di bloccare la sezione critica
 		lock.lock();
 		task.stato = task_state ::IDLE;
@@ -104,6 +116,7 @@ void Executive::task_function(Executive::task_data & task ) //funzione che decid
 void Executive::exec_function()
 {
 	rt::priority varprio = (rt::priority::rt_max-1);
+	
 	//chrono che mi serve per la sleep
 	auto point = std:: chrono::steady_clock::now();
 	auto lastpeppe = std::chrono::high_resolution_clock::now();
@@ -136,13 +149,14 @@ void Executive::exec_function()
 		}
 	
 		/* Attesa fino al prossimo inizio frame ... */
-
+		ncycle +=1;
+		std::cerr << "ciclo numero:  " << ncycle << std::endl;
 		std :: this_thread :: sleep_until(point);
 		//std::cout << point << std::endl;
-		auto next = std::chrono::high_resolution_clock::now();
-		std::chrono::duration<double,std::milli>elapsed(next-lastpeppe);
+		//auto next = std::chrono::high_resolution_clock::now();
+/* 		std::chrono::duration<double,std::milli>elapsed(next-lastpeppe);
 		std::cout << "tempo trascorso: " << elapsed.count() << std::endl;
-		lastpeppe = next;
+		lastpeppe = next; */
 
 		/* Controllo delle deadline ... */
 		for (auto id : frames[frame_id])
@@ -153,7 +167,18 @@ void Executive::exec_function()
 				p_tasks[id].stato = MISS;
 				rt::set_priority(p_tasks[id].thread, rt :: priority::rt_min);
 				std::cerr << "--------------------------------------------ho fatto una deadline miss " << id << std::endl;
+				nmiss +=1;
+				std::cerr << "MISS NUMERO :  " << nmiss << std::endl;
 				p_tasks[id].cond.notify_one();
+				//"scorrere la lista dei task di quel frame e aggiungere in un for i vari numeri di task ancora da eseguire
+				
+			
+				
+			}
+			else if (p_tasks[id].stato == PENDING)
+			{
+				ncanc+=1;
+				std::cerr << "task cancellato NUMERO :  " << ncanc << std::endl;
 			}
 				//lock.unlock();
 		}
@@ -161,6 +186,7 @@ void Executive::exec_function()
 		if (++frame_id == frames.size())
 		{
 			frame_id = 0;
+
 			// qui devo aggiornare le statistiche
 			//	stat_oserver (...);
 			// mettere subito questa funzione, è deleterio
@@ -187,6 +213,7 @@ void Executive::stats_function()
 {
 	while (true)
 	{
+
 		// reaalizzo applicazione, quando la coda non è vuota la consuma chiama la funzione observer
 		// e consuma. comunica solo tramite a coda
 		/* Consumo statistiche di task accodate (invocando stats_observer) ...*/

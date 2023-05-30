@@ -40,6 +40,8 @@ class Executive
 		global_stats get_global_stats();
 		
 
+		
+
 		/* [RUN] Lancia l'applicazione */
 		void start();
 
@@ -54,6 +56,7 @@ class Executive
 			RUNNING,
 			MISS
 		};
+
 		//inizializzare gli stati pending hydle running e miss
 		//ogni task è una struct
 		// aggiungo gli stati in cui mi posso trovare
@@ -93,6 +96,7 @@ class Executive
 		//uso quello che è nel monitor simple
 		std::function<void(const task_stats &)> stats_observer;
 		std::thread stats_thread;
+
 		
 		void stats_function();
 
