@@ -1,6 +1,7 @@
 #include <cassert>
 #include <iostream>
 //CIAO TONI
+//CIAO KEKKA
 #define VERBOSE
 
 #include "executive.h"
@@ -57,9 +58,6 @@ void Executive::start()
 	exec_thread = std::thread(&Executive::exec_function, this); //thread  monitor che deve avere priorità piu alta di tutti
 	rt::set_priority(exec_thread, rt::priority::rt_max);
 	rt::set_affinity(exec_thread, 1);
-
-	//inizializziamo i contatori  per le stats globali 
-		//p_tasks[task_id].wcet = wcet;
 
 
 	if (stats_observer)
