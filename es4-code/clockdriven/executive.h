@@ -40,8 +40,6 @@ class Executive
 		global_stats get_global_stats();
 		
 
-		
-
 		/* [RUN] Lancia l'applicazione */
 		void start();
 
@@ -83,6 +81,7 @@ class Executive
 
 		std::vector< std::vector<size_t> > frames;
 		
+
 		const unsigned int frame_length; // lunghezza del frame (in quanti temporali)
 		const std::chrono::milliseconds unit_time; // durata dell'unita di tempo (quanto temporale)
 		
@@ -98,7 +97,7 @@ class Executive
 		std::thread stats_thread;
 
 		
-		void stats_function();
+		void stats_function();  //per i singoliiiiiiiiiiiiiiiiiii
 
 		/* ... */
 };

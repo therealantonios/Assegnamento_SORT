@@ -12,11 +12,11 @@ Executive::Executive(size_t num_tasks, unsigned int frame_length, unsigned int u
 	: p_tasks(num_tasks), frame_length(frame_length), unit_time(unit_duration)
 {
 }
-
-	auto ncycle = 0;
-	auto nexec = 0;
-	auto nmiss = 0;
-	auto ncanc = 0;
+//contatori per statistiche globali
+auto ncycle = 0;
+auto nexec = 0;
+auto nmiss = 0;
+auto ncanc = 0;
 
 void Executive::set_periodic_task(size_t task_id, std::function<void()> periodic_task, unsigned int wcet) //wcet è il t di esec del task task_id
 {
@@ -95,7 +95,7 @@ void Executive::task_function(Executive::task_data & task ) //funzione che decid
 
 		task.function(); //sleep
 		nexec+=1;
-		std::cerr << "task eseguito NUMERO :  " << nexec << std::endl;
+		//std::cerr << "task eseguito NUMERO :  " << nexec << std::endl;
 		//ogni volta che devo agire sullo stato ho bisogno di bloccare la sezione critica
 		lock.lock();
 		task.stato = task_state ::IDLE;
@@ -149,8 +149,7 @@ void Executive::exec_function()
 		}
 	
 		/* Attesa fino al prossimo inizio frame ... */
-		ncycle +=1;
-		std::cerr << "ciclo numero:  " << ncycle << std::endl;
+
 		std :: this_thread :: sleep_until(point);
 		//std::cout << point << std::endl;
 		//auto next = std::chrono::high_resolution_clock::now();
@@ -166,47 +165,63 @@ void Executive::exec_function()
 			{
 				p_tasks[id].stato = MISS;
 				rt::set_priority(p_tasks[id].thread, rt :: priority::rt_min);
-				std::cerr << "--------------------------------------------ho fatto una deadline miss " << id << std::endl;
+				//std::cerr << "--------------------------------------------ho fatto una deadline miss " << id << std::endl;
 				nmiss +=1;
 				std::cerr << "MISS NUMERO :  " << nmiss << std::endl;
 				p_tasks[id].cond.notify_one();
 				//"scorrere la lista dei task di quel frame e aggiungere in un for i vari numeri di task ancora da eseguire
 				
 			
-				
 			}
 			else if (p_tasks[id].stato == PENDING)
 			{
 				ncanc+=1;
-				std::cerr << "task cancellato NUMERO :  " << ncanc << std::endl;
+				//std::cerr << "task cancellato NUMERO :  " << ncanc << std::endl;
 			}
 				//lock.unlock();
 		}
 
-		if (++frame_id == frames.size())
+		if (++frame_id == frames.size()) //forse per le stats singole 
 		{
 			frame_id = 0;
-
+			ncycle +=1;
+			//std::cerr << "ciclo numero:  " << ncycle << std::endl;
+			get_global_stats();
 			// qui devo aggiornare le statistiche
 			//	stat_oserver (...);
+
+
+
 			// mettere subito questa funzione, è deleterio
 			// in questa porzione preparo le statistiche
 			// una volta preparato il dato, realizzo uno scambio dati, x avere che la statistica sia accodata
 			////produco una nuova statstica e la metto in coda meccanismo di monitori visto
 			/* Update Statistiche, accodamento e notifica... */
 		}
+
 	}
 }
 
 void Executive::set_stats_observer(std::function<void(task_stats const &)> obs)
 {
-	stats_observer = obs; //GIA IMPLEMENTATA
+	stats_observer = obs; //GIA' IMPLEMENTATA
 }
 
 global_stats Executive::get_global_stats()
 {
-	/* ... */ //stats
+	global_stats glob;
+	glob.cycle_count = ncycle;
+	glob.exec_count = nexec;
+	glob.miss_count = nmiss;
+	glob.canc_count = ncanc;
+
+	std::cerr << "NUMERO DI IPERPERIODI:  " << glob.cycle_count << std::endl;
+	std::cerr << "NUMERO DI RILASCI:  " << glob.exec_count << std::endl;
+	std::cerr << "NUMERO DI DEADLINE MISS: " << glob.miss_count << std::endl;
+	std::cerr << "NUMERO DI MANCATE ESECUZIONI :  " << glob.canc_count << std::endl;
+
 	//ritorna lo stato attuale delle statistiche 
+	return glob;
 }
 
 void Executive::stats_function()

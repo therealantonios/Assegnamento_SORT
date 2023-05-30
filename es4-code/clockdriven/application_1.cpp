@@ -6,7 +6,7 @@
 void task0()
 {
 	std::cout << "Sono il task n.0" << std::endl;
-	busy_wait(9000);
+	busy_wait(90);
 	std::cout << "Sono il task n.00 FINE" << std::endl;
 }
 
@@ -26,7 +26,7 @@ void task2()
 void task3()
 {
 	std::cout << "Sono il task n.3" << std::endl;
-	busy_wait(450);
+	busy_wait(270);
 	std::cout << "Sono il task n.3 FINE" << std::endl;
 }
 

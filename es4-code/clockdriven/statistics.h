@@ -2,7 +2,7 @@
 #define STATISTICS_H
 
 /* statistiche di funzionamento di un singolo task, all'interno di un intervallo di execuzione */
-typedef struct
+typedef struct //per i singoliiiiiiiiiiiiiiiiiii
 {
 	unsigned task_id;    /* id del task a cui questa statistica è associato */
 	unsigned cycle_id;   /* id (progressivo) dell'iperperiodo in cui questa statistica è stata calcolata */
