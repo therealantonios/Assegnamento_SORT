@@ -39,6 +39,7 @@ void Executive::add_frame(std::vector<size_t> frame)
 
 
 void Executive::start()
+
 {
 	statistiche.cycle_count = 0;
 	statistiche.exec_count = 0;
@@ -282,7 +283,8 @@ void Executive::set_stats_observer(std::function<void(task_stats const &)> obs)
 
 global_stats Executive::get_global_stats()
 {
-	
+	//devo proteggere 
+	std::unique_lock<std::mutex> lock(mutex1);
 	return statistiche;
 }
 
