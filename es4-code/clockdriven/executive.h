@@ -7,7 +7,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <thread>
-
+#include <deque>
 #include "statistics.h"
 
 class Executive
@@ -47,6 +47,10 @@ class Executive
 		void wait();
 
 	private:
+	std::condition_variable cond;
+	std::deque<task_stats> buffer;
+	std::mutex mutex;
+
 		enum task_state
 		{
 			PENDING,
@@ -54,6 +58,10 @@ class Executive
 			RUNNING,
 			MISS
 		};
+
+		
+		global_stats statistiche;
+
 
 		//inizializzare gli stati pending hydle running e miss
 		//ogni task è una struct
@@ -66,6 +74,7 @@ class Executive
 			std::thread thread;
 			task_state stato;
 			unsigned int wcet;
+			task_stats stats;
 			//std::chrono::steady_clock deadline;
 			// running che sta eseguendo
 			// numero di task che devo eseguire in sequenza, l exec agisce solo allo scadere del frame raffaeee mokk a kiteviiiii
@@ -75,9 +84,10 @@ class Executive
 		
 		std::vector<task_data> p_tasks;
 		
+		
 		std::thread exec_thread;
 
-		std::mutex mutex;
+		std::mutex mutex1;
 
 		std::vector< std::vector<size_t> > frames;
 		
@@ -87,7 +97,7 @@ class Executive
 		
 		/* ... */
 		
-		static void task_function(task_data & task);
+		static void task_function(task_data & task, unsigned int & nexec);
 		
 		void exec_function();
 		
@@ -96,7 +106,11 @@ class Executive
 		std::function<void(const task_stats &)> stats_observer;
 		std::thread stats_thread;
 
-		
+		//contatori per statistiche globbali
+		unsigned int ncycle;
+		unsigned int nexec;
+		unsigned int nmiss;
+		unsigned int ncanc;
 		void stats_function();  //per i singoliiiiiiiiiiiiiiiiiii
 
 		/* ... */

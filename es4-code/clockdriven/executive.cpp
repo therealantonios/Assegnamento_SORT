@@ -5,6 +5,7 @@
 #define VERBOSE
 
 #include "executive.h"
+
 #include "rt/priority.h"
 #include "rt/affinity.h"
 
@@ -13,11 +14,8 @@ Executive::Executive(size_t num_tasks, unsigned int frame_length, unsigned int u
 	: p_tasks(num_tasks), frame_length(frame_length), unit_time(unit_duration)
 {
 }
-//contatori per statistiche globali
-auto ncycle = 0;
-auto nexec = 0;
-auto nmiss = 0;
-auto ncanc = 0;
+
+//contatori per statistiche globbali
 
 void Executive::set_periodic_task(size_t task_id, std::function<void()> periodic_task, unsigned int wcet) //wcet è il t di esec del task task_id
 {
@@ -42,17 +40,33 @@ void Executive::add_frame(std::vector<size_t> frame)
 
 void Executive::start()
 {
+	statistiche.cycle_count = 0;
+	statistiche.exec_count = 0;
+	statistiche.miss_count = 0;
+	statistiche.canc_count = 0;
+
 	for (size_t id = 0; id < p_tasks.size(); ++id)
 	{
 		assert(p_tasks[id].function); // Fallisce se set_periodic_task() non e' stato invocato per questo id
 		
-		p_tasks[id].thread = std::thread(&Executive::task_function, std::ref(p_tasks[id]));
+		p_tasks[id].thread = std::thread(&Executive::task_function, std::ref(p_tasks[id]), std::ref(nexec));
 
 		rt::affinity aff("1");
 
 		rt::set_affinity(p_tasks[id].thread, aff); //setto affinità per ogni task
 		//rt::set_priority(p_tasks[id].thread, rt::priority::rt_max -1); // setto priorità per ogni task
-	
+
+		p_tasks[id].stats.task_id = id;
+		p_tasks[id].stats.cycle_id = 0;
+		p_tasks[id].stats.exec_count = 0;
+		p_tasks[id].stats.miss_count = 0;
+		p_tasks[id].stats.canc_count = 0;
+		p_tasks[id].stats.avg_exec_time = 0;
+		p_tasks[id].stats.max_exec_time = 0;
+
+		
+		
+
 	}
 	
 	exec_thread = std::thread(&Executive::exec_function, this); //thread  monitor che deve avere priorità piu alta di tutti
@@ -75,7 +89,7 @@ void Executive::wait()
 		pt.thread.join();
 }
 
-void Executive::task_function(Executive::task_data & task ) //funzione che decide se eseguire il task o no 
+void Executive::task_function(Executive::task_data & task, unsigned int & nexec ) //funzione che decide se eseguire il task o no 
 {
 	while (true) 
 	{
@@ -90,13 +104,25 @@ void Executive::task_function(Executive::task_data & task ) //funzione che decid
 		task.stato = task_state ::RUNNING;
 		//libero dalla sezione critica
 		lock.unlock();
-
+		auto start_time = std::chrono::high_resolution_clock::now();
 		task.function(); //sleep
-		nexec+=1;
+		auto end_time = std::chrono::high_resolution_clock::now();
+
+		std::chrono::duration<double, std:: milli> elapsed (end_time - start_time) ;
+		task.stats.avg_exec_time += elapsed.count();
+
+		//_tasks[id].stats.miss_count +=1;
+
 		//std::cerr << "task eseguito NUMERO :  " << nexec << std::endl;
 		//ogni volta che devo agire sullo stato ho bisogno di bloccare la sezione critica
 		lock.lock();
 		task.stato = task_state ::IDLE;
+
+		if(task.stats.max_exec_time == 0)
+			task.stats.max_exec_time = elapsed.count();
+		else if(elapsed.count() > task.stats.max_exec_time)
+			task.stats.max_exec_time = elapsed.count();
+
 		//task.cond.notify_one();//invia la notifica xò può continuare ad eseguire
 		//lock.unlock();//per sicurezza la metto, anche se alla fine lo fa in automatico
 		//task_function SEMPRE FUORI DALLA REGIONE CRITICA!!! Se fosse in regione cirtica mi serializzarebbe 
@@ -117,8 +143,8 @@ void Executive::exec_function()
 	
 	//chrono che mi serve per la sleep
 	auto point = std:: chrono::steady_clock::now();
-	auto lastpeppe = std::chrono::high_resolution_clock::now();
-	auto frame_id = 0; // variabile da scorrere per capire quale frame sta lavorando
+	
+	size_t frame_id = 0; // variabile da scorrere per capire quale frame sta lavorando
 	// std::unique_lock<std::mutex> lock(mutex);
 	// std::function<void(const task_stats &)> stats_observer;
 	// std::thread stats_thread;
@@ -164,27 +190,76 @@ void Executive::exec_function()
 				p_tasks[id].stato = MISS;
 				rt::set_priority(p_tasks[id].thread, rt :: priority::rt_min);
 				//std::cerr << "--------------------------------------------ho fatto una deadline miss " << id << std::endl;
-				nmiss +=1;
+				//nmiss +=1;
+				p_tasks[id].stats.miss_count +=1;
+				
 				std::cerr << "MISS NUMERO :  " << nmiss << std::endl;
 				p_tasks[id].cond.notify_one();
-				//"scorrere la lista dei task di quel frame e aggiungere in un for i vari numeri di task ancora da eseguire
-				
-			
+				//"scorrere la lista dei task di quel frame e aggiungere in un for i vari numeri di task ancora da eseguire			
 			}
 			else if (p_tasks[id].stato == PENDING)
 			{
-				ncanc+=1;
+				//ncanc+=1;
+				p_tasks[id].stats.canc_count +=1;
 				//std::cerr << "task cancellato NUMERO :  " << ncanc << std::endl;
 			}
-				//lock.unlock();
+			else if (p_tasks[id].stato == IDLE)
+			{
+				p_tasks[id].stats.exec_count +=1;
+				
+				
+				p_tasks[id].stats.avg_exec_time = p_tasks[id].stats.avg_exec_time / p_tasks[id].stats.exec_count ;		//nexec+=1;
+				//p_tasks[id].stats.max_exec_time = p_tasks[id].stats;
+
+			}
+
+
+
 		}
 
 		if (++frame_id == frames.size()) //forse per le stats singole 
 		{
+			statistiche.cycle_count += 1;
+
+			for (size_t id = 0; id < p_tasks.size(); ++id)
+			{
+				p_tasks[id].stats.cycle_id +=1;
+				
+				
+
+				statistiche.miss_count += p_tasks[id].stats.miss_count;
+				statistiche.exec_count+= p_tasks[id].stats.exec_count;
+				statistiche.canc_count += p_tasks[id].stats.canc_count;
+
+				
+				//ncycle +=1;
+				std::unique_lock<std::mutex> lock(mutex1);
+				buffer.push_back(p_tasks[id].stats);
+				
+				if (!buffer.empty())
+				{
+					cond.notify_all();
+				}
+				p_tasks[id].stats.canc_count = 0;
+				p_tasks[id].stats.exec_count= 0;
+				p_tasks[id].stats.miss_count= 0;
+				p_tasks[id].stats.avg_exec_time=0;
+				p_tasks[id].stats.max_exec_time=0;
+	
+				/* p_stats[id].exec_count = 0;
+				p_stats[id].miss_count = 0;
+				p_stats[id].canc_count = 0;
+				p_stats[id].avg_exec_time = 0;
+				p_stats[id].max_exec_time = 0;  */
+
+				
+
+			}
+			
 			frame_id = 0;
-			ncycle +=1;
+
 			//std::cerr << "ciclo numero:  " << ncycle << std::endl;
-			get_global_stats();
+			
 			// qui devo aggiornare le statistiche
 			//	stat_oserver (...);
 
@@ -207,19 +282,8 @@ void Executive::set_stats_observer(std::function<void(task_stats const &)> obs)
 
 global_stats Executive::get_global_stats()
 {
-	global_stats glob;
-	glob.cycle_count = ncycle;
-	glob.exec_count = nexec;
-	glob.miss_count = nmiss;
-	glob.canc_count = ncanc;
-
-	std::cerr << "NUMERO DI IPERPERIODI:  " << glob.cycle_count << std::endl;
-	std::cerr << "NUMERO DI RILASCI:  " << glob.exec_count << std::endl;
-	std::cerr << "NUMERO DI DEADLINE MISS: " << glob.miss_count << std::endl;
-	std::cerr << "NUMERO DI MANCATE ESECUZIONI :  " << glob.canc_count << std::endl;
-
-	//ritorna lo stato attuale delle statistiche 
-	return glob;
+	
+	return statistiche;
 }
 
 void Executive::stats_function()
@@ -227,6 +291,21 @@ void Executive::stats_function()
 	while (true)
 	{
 
+	task_stats val;
+			
+			{
+				std::unique_lock<std::mutex> lock(mutex1);	// mutex acquired here
+
+				while( buffer.empty())
+					cond.wait(lock);
+
+												// mutex released here
+
+				val = buffer.front();
+				buffer.pop_front();
+			}	
+			if (stats_observer)
+				stats_observer(val);
 		// reaalizzo applicazione, quando la coda non è vuota la consuma chiama la funzione observer
 		// e consuma. comunica solo tramite a coda
 		/* Consumo statistiche di task accodate (invocando stats_observer) ...*/
