@@ -62,10 +62,6 @@ class Executive
 		
 		global_stats statistiche;
 
-
-		//inizializzare gli stati pending hydle running e miss
-		//ogni task è una struct
-		// aggiungo gli stati in cui mi posso trovare
 			struct task_data
 		{
 			std::function<void()> function;
@@ -74,46 +70,39 @@ class Executive
 			std::thread thread;
 			task_state stato;
 			unsigned int wcet;
+			//task_stats è un typedef struct definito in statistics.h
 			task_stats stats;
-			//std::chrono::steady_clock deadline;
-			// running che sta eseguendo
-			// numero di task che devo eseguire in sequenza, l exec agisce solo allo scadere del frame raffaeee mokk a kiteviiiii
 
-			/* ... */
+			// numero di task che devo eseguire in sequenza, l'exec agisce solo allo scadere del frame
 		};
 		
 		std::vector<task_data> p_tasks;
-		
 		
 		std::thread exec_thread;
 
 		std::mutex mutex1;
 
 		std::vector< std::vector<size_t> > frames;
-		
 
 		const unsigned int frame_length; // lunghezza del frame (in quanti temporali)
 		const std::chrono::milliseconds unit_time; // durata dell'unita di tempo (quanto temporale)
-		
-		/* ... */
 		
 		static void task_function(task_data & task, unsigned int & nexec);
 		
 		void exec_function();
 		
 		// statistiche ......
-		//uso quello che è nel monitor simple
+
 		std::function<void(const task_stats &)> stats_observer;
 		std::thread stats_thread;
 
-		//contatori per statistiche globbali
+		//contatori per statistiche globali
 		unsigned int ncycle;
 		unsigned int nexec;
 		unsigned int nmiss;
 		unsigned int ncanc;
-		void stats_function();  //per i singoliiiiiiiiiiiiiiiiiii
+		void stats_function();
 
-		/* ... */
 };
 
 #endif

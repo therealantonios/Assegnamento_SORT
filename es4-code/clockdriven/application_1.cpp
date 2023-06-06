@@ -39,6 +39,7 @@ void task4()
 
 int main()
 {
+	//executive.cpp in cui nel costruttore
 	Executive exec(5, 4, 100);
 
 	exec.set_periodic_task(0, task0, 1); // tau_1
